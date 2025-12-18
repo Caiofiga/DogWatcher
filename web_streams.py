@@ -24,7 +24,7 @@ feed2_capture = None
 
 
 def initialize_cameras():
-    """Initialize both camera captures"""
+    """Initialize both camera captures with low-latency settings"""
     global feed1_capture, feed2_capture
     # Require that environment variables are set (no hardcoded credentials)
     if not STREAM_1_URL:
@@ -32,24 +32,18 @@ def initialize_cameras():
     if not STREAM_2_URL:
         raise RuntimeError("Missing STREAM_2_URL environment variable")
 
-    # Force TCP transport using CAP_PROP_OPEN_TIMEOUT_MSEC before opening
     feed1_capture = cv2.VideoCapture(STREAM_1_URL, cv2.CAP_FFMPEG)
 
-    # Set buffer size to reduce latency and improve stability
+    # Minimize buffer to reduce latency (keep only 1 frame in buffer)
     feed1_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    feed1_capture.set(cv2.CAP_PROP_FPS, 15)  # Lower FPS for stability
-    feed1_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    feed1_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # Don't try to force resolution/FPS - let camera provide native stream
 
     feed2_capture = cv2.VideoCapture(STREAM_2_URL, cv2.CAP_FFMPEG)
     feed2_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    feed2_capture.set(cv2.CAP_PROP_FPS, 15)
-    feed2_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    feed2_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 
 def generateFeed1Frames():
-    """Generate Stream 1 frames (no motion detection)."""
+    """Generate Stream 1 frames - simple and reliable."""
     global feed1_capture
 
     while True:
@@ -57,6 +51,7 @@ def generateFeed1Frames():
             break
 
         ret, frame = feed1_capture.read()
+
         if not ret or frame is None:
             # send a blank frame instead of blocking
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -73,7 +68,7 @@ def generateFeed1Frames():
 
 
 def generateFeed2Frames():
-    """Generate Stream 2 frames (no motion detection)."""
+    """Generate Stream 2 frames - simple and reliable."""
     global feed2_capture
 
     while True:
@@ -81,6 +76,7 @@ def generateFeed2Frames():
             break
 
         ret, frame = feed2_capture.read()
+
         if not ret or frame is None:
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(frame, "No Stream", (200, 240),
