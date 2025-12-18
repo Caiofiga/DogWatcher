@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background-color: gray;
+        font-family: Arial, sans-serif;
+      }
+
+      .container {
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 40px);
+      }
+
+      .video-box {
+        flex: 1;
+        background-color: white;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .header {
+        margin-bottom: 15px;
+      }
+
+      .title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+      }
+
+      .video-stream {
+        width: 100%;
+        height: calc(100% - 60px);
+        object-fit: contain;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="video-box">
+        <div class="header">
+          <div class="title">Jardim</div>
+        </div>
+        <img class="video-stream" src="{{ url_for('rtsp_feed') }}" />
+      </div>
+
+      <div class="video-box">
+        <div class="header">
+          <div class="title">Sala</div>
+        </div>
+        <img class="video-stream" src="{{ url_for('http_feed') }}" />
+      </div>
+    </div>
+  </body>
+</html>
