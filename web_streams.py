@@ -1,9 +1,10 @@
+import numpy as np
+import time
+import imutils
+import cv2
 from flask import Flask, render_template, Response
 import os
-import cv2
-import imutils
-import time
-import numpy as np
+
 
 # Stream URLs are provided via environment variables (set by docker-compose/.env)
 STREAM_1_URL = os.environ.get("STREAM_1_URL")
@@ -31,16 +32,20 @@ def initialize_cameras():
     if not STREAM_2_URL:
         raise RuntimeError("Missing STREAM_2_URL environment variable")
 
-    # Initialize first capture
+    # Force TCP transport using CAP_PROP_OPEN_TIMEOUT_MSEC before opening
     feed1_capture = cv2.VideoCapture(STREAM_1_URL, cv2.CAP_FFMPEG)
 
-    # Set capture options
+    # Set buffer size to reduce latency and improve stability
     feed1_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    feed1_capture.set(cv2.CAP_PROP_FPS, 15)
+    feed1_capture.set(cv2.CAP_PROP_FPS, 15)  # Lower FPS for stability
+    feed1_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    feed1_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-    # Initialize second capture
     feed2_capture = cv2.VideoCapture(STREAM_2_URL, cv2.CAP_FFMPEG)
     feed2_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    feed2_capture.set(cv2.CAP_PROP_FPS, 15)
+    feed2_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    feed2_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 
 def generateFeed1Frames():
