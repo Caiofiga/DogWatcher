@@ -47,14 +47,14 @@
     <div class="container">
       <div class="video-box">
         <div class="header">
-          <div class="title">Jardim</div>
+          <div class="title">{{ stream1_name }}</div>
         </div>
         <img class="video-stream" src="{{ url_for('rtsp_feed') }}" />
       </div>
 
       <div class="video-box">
         <div class="header">
-          <div class="title">Sala</div>
+          <div class="title">{{ stream2_name }}</div>
         </div>
         <img class="video-stream" src="{{ url_for('http_feed') }}" />
       </div>

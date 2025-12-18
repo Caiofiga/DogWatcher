@@ -3,8 +3,11 @@ services:
   app:
     build: .
     image: dogwatcher_app
-    env_file: 
-      - .env
+    environment:
+      STREAM_1_URL: ""
+      STREAM_2_URL: ""
+      STREAM_1_NAME: ""
+      STREAM_2_NAME: ""
     ports:
       - "5001:5001"
     restart: unless-stopped
