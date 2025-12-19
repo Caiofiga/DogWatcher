@@ -58,23 +58,33 @@ def capture_feed1():
     global feed1_frame, feed1_capture, capture_threads_running
 
     while capture_threads_running:
-        if feed1_capture is None:
-            time.sleep(0.1)
-            continue
+        try:
+            if feed1_capture is None:
+                time.sleep(0.1)
+                continue
 
-        ret, frame = feed1_capture.read()
+            ret, frame = feed1_capture.read()
 
-        if not ret or frame is None:
-            # Create a blank "No Stream" frame
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(frame, "No Stream", (200, 240),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        else:
-            frame = imutils.resize(frame, width=w_size)
+            if not ret or frame is None:
+                # Create a blank "No Stream" frame
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(frame, "No Stream", (200, 240),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            else:
+                frame = imutils.resize(frame, width=w_size)
 
-        # Update the shared frame buffer with thread safety
-        with feed1_lock:
-            feed1_frame = frame.copy()
+            # Update the shared frame buffer with thread safety
+            with feed1_lock:
+                feed1_frame = frame.copy()
+
+        except Exception as e:
+            # Log the error and create an error frame
+            print(f"Error in capture_feed1: {e}")
+            error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(error_frame, f"Error: {str(e)[:30]}", (50, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            with feed1_lock:
+                feed1_frame = error_frame.copy()
 
         time.sleep(0.01)  # Small delay to prevent excessive CPU usage
 
@@ -84,23 +94,33 @@ def capture_feed2():
     global feed2_frame, feed2_capture, capture_threads_running
 
     while capture_threads_running:
-        if feed2_capture is None:
-            time.sleep(0.1)
-            continue
+        try:
+            if feed2_capture is None:
+                time.sleep(0.1)
+                continue
 
-        ret, frame = feed2_capture.read()
+            ret, frame = feed2_capture.read()
 
-        if not ret or frame is None:
-            # Create a blank "No Stream" frame
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(frame, "No Stream", (200, 240),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        else:
-            frame = imutils.resize(frame, width=w_size)
+            if not ret or frame is None:
+                # Create a blank "No Stream" frame
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(frame, "No Stream", (200, 240),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            else:
+                frame = imutils.resize(frame, width=w_size)
 
-        # Update the shared frame buffer with thread safety
-        with feed2_lock:
-            feed2_frame = frame.copy()
+            # Update the shared frame buffer with thread safety
+            with feed2_lock:
+                feed2_frame = frame.copy()
+
+        except Exception as e:
+            # Log the error and create an error frame
+            print(f"Error in capture_feed2: {e}")
+            error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(error_frame, f"Error: {str(e)[:30]}", (50, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            with feed2_lock:
+                feed2_frame = error_frame.copy()
 
         time.sleep(0.01)  # Small delay to prevent excessive CPU usage
 
@@ -110,22 +130,35 @@ def generateFeed1Frames():
     global feed1_frame
 
     while True:
-        # Get the latest frame from the shared buffer with thread safety
-        with feed1_lock:
-            if feed1_frame is None:
-                # Create a blank "Initializing" frame
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(frame, "Initializing...", (200, 240),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            else:
-                frame = feed1_frame.copy()
+        try:
+            # Get the latest frame from the shared buffer with thread safety
+            with feed1_lock:
+                if feed1_frame is None:
+                    # Create a blank "Initializing" frame
+                    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(frame, "Initializing...", (200, 240),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                else:
+                    frame = feed1_frame.copy()
 
-        # Encode frame to JPEG
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if ret:
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            # Encode frame to JPEG
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if ret:
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        except Exception as e:
+            print(f"Error in generateFeed1Frames: {e}")
+            # Create an error frame
+            error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(error_frame, "Stream Error", (200, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            ret, buffer = cv2.imencode('.jpg', error_frame)
+            if ret:
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
         time.sleep(0.033)  # ~30 FPS
 
@@ -135,22 +168,35 @@ def generateFeed2Frames():
     global feed2_frame
 
     while True:
-        # Get the latest frame from the shared buffer with thread safety
-        with feed2_lock:
-            if feed2_frame is None:
-                # Create a blank "Initializing" frame
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(frame, "Initializing...", (200, 240),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            else:
-                frame = feed2_frame.copy()
+        try:
+            # Get the latest frame from the shared buffer with thread safety
+            with feed2_lock:
+                if feed2_frame is None:
+                    # Create a blank "Initializing" frame
+                    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(frame, "Initializing...", (200, 240),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                else:
+                    frame = feed2_frame.copy()
 
-        # Encode frame to JPEG
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if ret:
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            # Encode frame to JPEG
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if ret:
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        except Exception as e:
+            print(f"Error in generateFeed2Frames: {e}")
+            # Create an error frame
+            error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(error_frame, "Stream Error", (200, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            ret, buffer = cv2.imencode('.jpg', error_frame)
+            if ret:
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
         time.sleep(0.033)  # ~30 FPS
 
@@ -161,16 +207,16 @@ def index():
     return render_template('index.html', stream1_name=STREAM_1_NAME, stream2_name=STREAM_2_NAME)
 
 
-@app.route('/rtsp_feed')
-def rtsp_feed():
-    """RTSP video feed route"""
+@app.route('/feed1')
+def feed1():
+    """Feed 1 video stream route"""
     return Response(generateFeed1Frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
-@app.route('/http_feed')
-def http_feed():
-    """HTTP video feed route"""
+@app.route('/feed2')
+def feed2():
+    """Feed 2 video stream route"""
     return Response(generateFeed2Frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
