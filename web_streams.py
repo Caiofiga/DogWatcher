@@ -4,6 +4,7 @@ import imutils
 import cv2
 from flask import Flask, render_template, Response
 import os
+import threading
 
 
 # Stream URLs are provided via environment variables (set by docker-compose/.env)
@@ -18,9 +19,19 @@ app = Flask(__name__)
 
 # Global variables
 w_size = 600  # Smaller size for web display
-first_frame = None
+
+# Shared frame buffers for multi-user access
+feed1_frame = None
+feed2_frame = None
+feed1_lock = threading.Lock()
+feed2_lock = threading.Lock()
+
+# Camera capture objects (used only by background threads)
 feed1_capture = None
 feed2_capture = None
+
+# Background thread control
+capture_threads_running = False
 
 
 def initialize_cameras():
@@ -42,53 +53,106 @@ def initialize_cameras():
     feed2_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
 
-def generateFeed1Frames():
-    """Generate Stream 1 frames - simple and reliable."""
-    global feed1_capture
+def capture_feed1():
+    """Background thread that continuously captures Stream 1 frames"""
+    global feed1_frame, feed1_capture, capture_threads_running
 
-    while True:
+    while capture_threads_running:
         if feed1_capture is None:
-            break
+            time.sleep(0.1)
+            continue
 
         ret, frame = feed1_capture.read()
 
         if not ret or frame is None:
-            # send a blank frame instead of blocking
+            # Create a blank "No Stream" frame
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(frame, "No Stream", (200, 240),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         else:
             frame = imutils.resize(frame, width=w_size)
 
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if ret:
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        # Update the shared frame buffer with thread safety
+        with feed1_lock:
+            feed1_frame = frame.copy()
+
+        time.sleep(0.01)  # Small delay to prevent excessive CPU usage
 
 
-def generateFeed2Frames():
-    """Generate Stream 2 frames - simple and reliable."""
-    global feed2_capture
+def capture_feed2():
+    """Background thread that continuously captures Stream 2 frames"""
+    global feed2_frame, feed2_capture, capture_threads_running
 
-    while True:
+    while capture_threads_running:
         if feed2_capture is None:
-            break
+            time.sleep(0.1)
+            continue
 
         ret, frame = feed2_capture.read()
 
         if not ret or frame is None:
+            # Create a blank "No Stream" frame
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(frame, "No Stream", (200, 240),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
         else:
             frame = imutils.resize(frame, width=w_size)
 
+        # Update the shared frame buffer with thread safety
+        with feed2_lock:
+            feed2_frame = frame.copy()
+
+        time.sleep(0.01)  # Small delay to prevent excessive CPU usage
+
+
+def generateFeed1Frames():
+    """Generate Stream 1 frames from shared buffer - thread-safe for multiple viewers."""
+    global feed1_frame
+
+    while True:
+        # Get the latest frame from the shared buffer with thread safety
+        with feed1_lock:
+            if feed1_frame is None:
+                # Create a blank "Initializing" frame
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(frame, "Initializing...", (200, 240),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            else:
+                frame = feed1_frame.copy()
+
+        # Encode frame to JPEG
         ret, buffer = cv2.imencode('.jpg', frame)
         if ret:
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        time.sleep(0.033)  # ~30 FPS
+
+
+def generateFeed2Frames():
+    """Generate Stream 2 frames from shared buffer - thread-safe for multiple viewers."""
+    global feed2_frame
+
+    while True:
+        # Get the latest frame from the shared buffer with thread safety
+        with feed2_lock:
+            if feed2_frame is None:
+                # Create a blank "Initializing" frame
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(frame, "Initializing...", (200, 240),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            else:
+                frame = feed2_frame.copy()
+
+        # Encode frame to JPEG
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if ret:
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        time.sleep(0.033)  # ~30 FPS
 
 
 @app.route('/')
@@ -115,11 +179,22 @@ if __name__ == '__main__':
     # Initialize cameras
     initialize_cameras()
 
+    # Start background capture threads
+    capture_threads_running = True
+    thread1 = threading.Thread(target=capture_feed1, daemon=True)
+    thread2 = threading.Thread(target=capture_feed2, daemon=True)
+    thread1.start()
+    thread2.start()
+
     try:
         # Run Flask app
         app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
     finally:
         # Clean up
+        capture_threads_running = False
+        thread1.join(timeout=2)
+        thread2.join(timeout=2)
+
         if feed1_capture:
             feed1_capture.release()
         if feed2_capture:

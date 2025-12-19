@@ -1,20 +1,18 @@
-version: '3.8'
 services:
   app:
-    build: .
-    image: dogwatcher_app
-    environment:
-      STREAM_1_URL: ""
-      STREAM_2_URL: ""
-      STREAM_1_NAME: ""
-      STREAM_2_NAME: ""
-    ports:
-      - "5001:5001"
-    restart: unless-stopped
-    volumes:
-      - ./:/app:ro
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 1G
+    environment:
+      OPENCV_FFMPEG_CAPTURE_OPTIONS: rtsp_transport;udp|rtsp_flags;prefer_tcp|fflags;nobuffer|flags;low_delay
+      STREAM_1_NAME: 
+      STREAM_1_URL: 
+      STREAM_2_NAME: 
+      STREAM_2_URL:
+    image: ghcr.io/caiofiga/dogwatcher:latest
+    ports:
+      - '30050:5001'
+    restart: unless-stopped
+version: '3.8'
